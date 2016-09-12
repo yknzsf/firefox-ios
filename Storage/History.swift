@@ -37,6 +37,8 @@ public protocol BrowserHistory {
     func clearTopSitesCache() -> Success
     func refreshTopSitesCache() -> Success
     func areTopSitesDirty(withLimit limit: Int) -> Deferred<Maybe<Bool>>
+
+    func storeMetadata(metadata: PageMetadata) -> Success
 }
 
 /**

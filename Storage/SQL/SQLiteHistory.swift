@@ -378,6 +378,35 @@ extension SQLiteHistory: BrowserHistory {
         return self.getFilteredSitesByVisitDateWithLimit(limit, whereURLContains: nil, includeIcon: true)
     }
 
+    public func storeMetadata(metadata: PageMetadata) -> Success {
+        let insertQuery = [
+            "INSERT OR REPLACE INTO \(TablePageMetadata) (siteID, url, title, description, imageURL, type, iconURL)",
+            "VALUES ((SELECT id FROM \(TableHistory) WHERE url = ?), ?, ?, ?, ?, ?, ?)"
+        ].joinWithSeparator(" ")
+
+        let args: Args = [
+            metadata.url.absoluteString,
+            metadata.url.absoluteString,
+            metadata.title,
+            metadata.description,
+            metadata.imageURL?.absoluteString,
+            metadata.type,
+            metadata.iconURL?.absoluteString
+        ]
+
+        var error: NSError? = nil
+        db.withWritableConnection(&error) { (conn, inout err: NSError?) -> Int in
+            error = conn.executeChange(insertQuery, withArgs: args)
+            if error != nil {
+                log.warning("Metadata insertion failed with \(err?.localizedDescription)")
+                return 0
+            }
+            return 1
+        }
+
+        return failOrSucceed(error, op: "Record visit")
+    }
+
     private class func basicHistoryColumnFactory(row: SDRow) -> Site {
         let id = row["historyID"] as! Int
         let url = row["url"] as! String

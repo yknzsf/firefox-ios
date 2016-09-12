@@ -20,6 +20,8 @@ let TableBookmarksBufferStructure = "bookmarksBufferStructure"         // Added 
 let TableBookmarksLocal = "bookmarksLocal"                             // Added in v12. Supersedes 'bookmarks'.
 let TableBookmarksLocalStructure = "bookmarksLocalStructure"           // Added in v12.
 
+let TablePageMetadata = "pageMetadata"                                 // Added in v17
+
 let TableFavicons = "favicons"
 let TableHistory = "history"
 let TableCachedTopSites = "cached_top_sites"
@@ -66,6 +68,7 @@ private let AllTables: [String] = [
     TableBookmarksMirrorStructure,
 
     TableQueuedTabs,
+    TablePageMetadata,
 ]
 
 private let AllViews: [String] = [
@@ -100,7 +103,7 @@ private let log = Logger.syncLogger
  * We rely on SQLiteHistory having initialized the favicon table first.
  */
 public class BrowserTable: Table {
-    static let DefaultVersion = 16    // Bug 1185038.
+    static let DefaultVersion = 17    // Bug 1185038.
 
     // TableInfo fields.
     var name: String { return "BROWSER" }
@@ -233,6 +236,17 @@ public class BrowserTable: Table {
             "url TEXT NOT NULL UNIQUE, " +
             "title TEXT" +
         ") "
+
+    let pageMetadataTableCreate =
+        "CREATE TABLE IF NOT EXISTS \(TablePageMetadata) (" +
+            "siteID UNIQUE NOT NULL REFERENCES \(TableHistory)(id) ON DELETE CASCADE," +
+            "url TEXT UNIQUE NOT NULL," +
+            "title TEXT," +
+            "description TEXT," +
+            "imageURL TEXT," +
+            "type TEXT," +
+            "iconURL TEXT" +
+        ")"
 
     let iconColumns = ", faviconID INTEGER REFERENCES \(TableFavicons)(id) ON DELETE SET NULL"
     let mirrorColumns = ", is_overridden TINYINT NOT NULL DEFAULT 0"
@@ -551,6 +565,7 @@ public class BrowserTable: Table {
             historyVisitsView,
             awesomebarBookmarksView,
             awesomebarBookmarksWithIconsView,
+            pageMetadataTableCreate
         ]
 
         assert(queries.count == AllTablesIndicesAndViews.count, "Did you forget to add your table, index, or view to the list?")
@@ -757,6 +772,12 @@ public class BrowserTable: Table {
                 historyVisitsView,
                 awesomebarBookmarksView,
                 awesomebarBookmarksWithIconsView]) {
+                return false
+            }
+        }
+
+        if from < 17 && to >= 17 {
+            if !self.run(db, queries: [pageMetadataTableCreate]) {
                 return false
             }
         }
