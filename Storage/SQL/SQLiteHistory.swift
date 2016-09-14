@@ -445,9 +445,36 @@ extension SQLiteHistory: BrowserHistory {
         return nil
     }
 
+    private class func metadataColumnFactory(row: SDRow) -> PageMetadata? {
+        if let url = (row["url"] as? String)?.asURL {
+            return PageMetadata(
+                url: url,
+                title: row["title"] as? String,
+                description: row["description"] as? String,
+                imageURL: (row["imageURL"] as? String)?.asURL,
+                type: row["type"] as? String,
+                iconURL: (row["iconURL"] as? String)?.asURL
+            )
+        }
+        return nil
+    }
+
     private class func iconHistoryColumnFactory(row: SDRow) -> Site {
         let site = basicHistoryColumnFactory(row)
         site.icon = iconColumnFactory(row)
+        return site
+    }
+
+    private class func metadataIconHistoryColumnFactory(row: SDRow) -> Site {
+        let site = basicHistoryColumnFactory(row)
+        site.icon = iconColumnFactory(row)
+        site.metadata = metadataColumnFactory(row)
+        return site
+    }
+
+    private class func metadataHistoryColumnFactory(row: SDRow) -> Site {
+        let site = basicHistoryColumnFactory(row)
+        site.metadata = metadataColumnFactory(row)
         return site
     }
 
@@ -531,7 +558,7 @@ extension SQLiteHistory: BrowserHistory {
         ].joinWithSeparator(" ")
 
         let historySQL = [
-        "SELECT historyID, url, title, guid, domain_id, domain, visitCount,",
+        "SELECT historyID, url as historyURL, title as historyTitle, guid, domain_id, domain, visitCount,",
         "max(localVisitDate) AS localVisitDate,",
         "max(remoteVisitDate) AS remoteVisitDate",
         "FROM (", ungroupedSQL, ")",
@@ -541,6 +568,16 @@ extension SQLiteHistory: BrowserHistory {
         "LIMIT \(limit)",
         ].joinWithSeparator(" ")
 
+
+        let historyAndMetadataSQL = [
+        "SELECT",
+        "historyID, historyURL AS url, historyTitle AS title, guid, domain_id, domain,",
+        "localVisitDate, remoteVisitDate, visitCount,",
+        "title, description, imageURL, type, iconURL",
+        "FROM (", historySQL, ") LEFT OUTER JOIN ",
+        "\(TablePageMetadata) ON \(TablePageMetadata).siteID = historyID"
+        ].joinWithSeparator(" ")
+
         if includeIcon {
             // We select the history items then immediately join to get the largest icon.
             // We do this so that we limit and filter *before* joining against icons.
@@ -548,15 +585,16 @@ extension SQLiteHistory: BrowserHistory {
             "SELECT",
             "historyID, url, title, guid, domain_id, domain,",
             "localVisitDate, remoteVisitDate, visitCount, ",
-            "iconID, iconURL, iconDate, iconType, iconWidth ",
-            "FROM (", historySQL, ") LEFT OUTER JOIN ",
+            "title, description, imageURL, type,",
+            "iconID, \(ViewHistoryIDsWithWidestFavicons).iconURL AS iconURL, iconDate, iconType, iconWidth ",
+            "FROM (", historyAndMetadataSQL, ") LEFT OUTER JOIN ",
             "view_history_id_favicon ON historyID = view_history_id_favicon.id",
             ].joinWithSeparator(" ")
-            let factory = SQLiteHistory.iconHistoryColumnFactory
+            let factory = SQLiteHistory.metadataIconHistoryColumnFactory
             return db.runQuery(sql, args: args, factory: factory)
         }
 
-        let factory = SQLiteHistory.basicHistoryColumnFactory
+        let factory = SQLiteHistory.metadataHistoryColumnFactory
         return db.runQuery(historySQL, args: args, factory: factory)
     }
 

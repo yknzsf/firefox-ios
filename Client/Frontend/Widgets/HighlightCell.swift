@@ -18,7 +18,7 @@ struct HighlightCellUX {
     static let NearestNeighbordScalingThreshold: CGFloat = 24
 }
 
-class HighlightCell: UITableViewCell {
+class DetailedHighlightCell: UITableViewCell {
     var siteImage: UIImage? = nil {
         didSet {
             if let image = siteImage {
@@ -179,11 +179,12 @@ class HighlightCell: UITableViewCell {
             }
             self.siteImage = img
         }
-        backgroundImage.sd_setImageWithURL(NSURL(string: "http://lorempixel.com/640/480/?r=" + String(random())))
         siteImageView.layer.masksToBounds = true
     }
+}
 
-    func configureHighlightCell(site: Site) {
+extension DetailedHighlightCell: SiteView {
+    func configureWithSite(site: Site) {
         if let icon = site.icon {
             let url = icon.url
             self.setImageWithURL(NSURL(string: url)!)
@@ -191,9 +192,14 @@ class HighlightCell: UITableViewCell {
             self.siteImage = FaviconFetcher.getDefaultFavicon(NSURL(string: site.url)!)
             self.siteImageView.layer.borderWidth = 0.5
         }
+
         self.titleLabel.text = site.title.characters.count <= 1 ? site.url : site.title
         self.descriptionLabel.text = "Bookmarked"
         self.statusIcon.image = UIImage(named: "bookmarked_passive")
         self.timeStamp.text = "3 days ago"
+
+        if let imageURL = site.metadata?.imageURL {
+            backgroundImage.sd_setImageWithURL(imageURL)
+        }
     }
 }

@@ -75,6 +75,7 @@ public class Site: Identifiable {
     public var icon: Favicon?
     public var latestVisit: Visit?
     public let bookmarked: Bool?
+    public var metadata: PageMetadata?
 
     public convenience init(url: String, title: String) {
         self.init(url: url, title: title, bookmarked: false)

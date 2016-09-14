@@ -168,7 +168,9 @@ class SimpleHighlightCell: UITableViewCell {
         self.siteImage = nil
         self.timeStamp.text = nil
     }
+}
 
+extension SimpleHighlightCell: SiteView {
     func configureWithSite(site: Site) {
         if let icon = site.icon {
             let url = icon.url

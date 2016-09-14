@@ -58,7 +58,8 @@ class ActivityStreamPanel: UITableViewController, HomePanel {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        tableView.registerClass(SimpleHighlightCell.self, forCellReuseIdentifier: "HistoryCell")
+        tableView.registerClass(SimpleHighlightCell.self, forCellReuseIdentifier: "SimpleHighlightCell")
+        tableView.registerClass(DetailedHighlightCell.self, forCellReuseIdentifier: "HighlightCell")
         tableView.registerClass(ASHorizontalScrollCell.self, forCellReuseIdentifier: "TopSiteCell")
         tableView.backgroundColor = ASPanelUX.backgroundColor
         tableView.separatorStyle = .None
@@ -131,13 +132,6 @@ extension ActivityStreamPanel {
             }
         }
 
-        var cellIdentifier: String {
-            switch self {
-            case .TopSites: return "TopSiteCell"
-            case .History: return "HistoryCell"
-            }
-        }
-
         init(at indexPath: NSIndexPath) {
             self.init(rawValue: indexPath.section)!
         }
@@ -202,30 +196,27 @@ extension ActivityStreamPanel {
     }
 
     override func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
-        let identifier = Section(indexPath.section).cellIdentifier
-        let cell = tableView.dequeueReusableCellWithIdentifier(identifier, forIndexPath: indexPath)
-
         switch Section(indexPath.section) {
         case .TopSites:
-            return configureTopSitesCell(cell, forIndexPath: indexPath)
+            let cell = tableView.dequeueReusableCellWithIdentifier("TopSiteCell", forIndexPath: indexPath)
+            let topSiteCell = cell as! ASHorizontalScrollCell
+            topSiteCell.delegate = self.topSitesManager
+            return cell
         case .History:
-            return configureHistoryItemCell(cell, forIndexPath: indexPath)
+            let site = history[indexPath.row]
+            let siteCell: UITableViewCell
+
+            // Temp: If we have a rich image link associated with a highlight, show the full cell instead
+            if let _ = site.metadata?.imageURL {
+                siteCell = tableView.dequeueReusableCellWithIdentifier("HighlightCell", forIndexPath: indexPath)
+            } else {
+                siteCell = tableView.dequeueReusableCellWithIdentifier("SimpleHighlightCell", forIndexPath: indexPath)
+            }
+
+            (siteCell as? SiteView)?.configureWithSite(site)
+            return siteCell
         }
     }
-
-    func configureTopSitesCell(cell: UITableViewCell, forIndexPath indexPath: NSIndexPath) -> UITableViewCell {
-        let topSiteCell = cell as! ASHorizontalScrollCell
-        topSiteCell.delegate = self.topSitesManager
-        return cell
-    }
-
-    func configureHistoryItemCell(cell: UITableViewCell, forIndexPath indexPath: NSIndexPath) -> UITableViewCell {
-        let simpleHighlightCell = cell as! SimpleHighlightCell
-        let site = history[indexPath.row]
-        simpleHighlightCell.configureWithSite(site)
-        return simpleHighlightCell
-    }
-
 }
 
 // MARK: - Data Management
