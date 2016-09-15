@@ -3,6 +3,7 @@ github "mozilla/Deferred"           "2.0.1"           # Making Deferred extensib
 github "swisspol/GCDWebServer"		"3.3.2"			     
 github "kif-framework/KIF"          "v3.3.2"
 github "mozilla/readability"        "master"
+github "sleroux/page-metadata-parser" "sleroux/WebPackForIOS"
 github "rs/SDWebImage"              "3.7.4"           
 github "SnapKit/SnapKit"            "0.18.0"
 github "drmohundro/SWXMLHash"       "2.1.0"
