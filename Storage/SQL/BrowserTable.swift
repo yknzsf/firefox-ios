@@ -28,6 +28,10 @@ let TableVisits = "visits"
 let TableFaviconSites = "favicon_sites"
 let TableQueuedTabs = "queue"
 
+let TablePageMetadata = "page_metadata"
+let TablePageImages = "page_images"
+let TablePageMetadataImages = "page_metadata_images"
+
 let ViewBookmarksBufferOnMirror = "view_bookmarksBuffer_on_mirror"
 let ViewBookmarksBufferStructureOnMirror = "view_bookmarksBufferStructure_on_mirror"
 let ViewBookmarksLocalOnMirror = "view_bookmarksLocal_on_mirror"
@@ -40,6 +44,7 @@ let ViewHistoryVisits = "view_history_visits"
 let ViewWidestFaviconsForSites = "view_favicons_widest"
 let ViewHistoryIDsWithWidestFavicons = "view_history_id_favicon"
 let ViewIconForURL = "view_icon_for_url"
+let ViewHistoryPageMetadata = "view_history_page_metadata"
 
 let IndexHistoryShouldUpload = "idx_history_should_upload"
 let IndexVisitsSiteIDDate = "idx_visits_siteID_date"                   // Removed in v6.
@@ -48,6 +53,8 @@ let IndexBookmarksMirrorStructureParentIdx = "idx_bookmarksMirrorStructure_paren
 let IndexBookmarksLocalStructureParentIdx = "idx_bookmarksLocalStructure_parent_idx"     // Added in v12.
 let IndexBookmarksBufferStructureParentIdx = "idx_bookmarksBufferStructure_parent_idx"   // Added in v12.
 let IndexBookmarksMirrorStructureChild = "idx_bookmarksMirrorStructure_child"            // Added in v14.
+let IndexPageMetadataCacheKey = "idx_page_metadata_cache_key_uniqueindex" // Added in v17
+let IndexPageImagesURL = "idx_page_images_url_uniqueindex" // Added in v17
 
 private let AllTables: [String] = [
     TableDomains,
@@ -64,8 +71,11 @@ private let AllTables: [String] = [
     TableBookmarksLocalStructure,
     TableBookmarksMirror,
     TableBookmarksMirrorStructure,
-
     TableQueuedTabs,
+
+    TablePageMetadata,
+    TablePageImages,
+    TablePageMetadataImages
 ]
 
 private let AllViews: [String] = [
@@ -79,7 +89,7 @@ private let AllViews: [String] = [
     ViewAllBookmarks,
     ViewAwesomebarBookmarks,
     ViewAwesomebarBookmarksWithIcons,
-    ViewHistoryVisits,
+    ViewHistoryVisits
 ]
 
 private let AllIndices: [String] = [
@@ -89,6 +99,8 @@ private let AllIndices: [String] = [
     IndexBookmarksLocalStructureParentIdx,
     IndexBookmarksMirrorStructureParentIdx,
     IndexBookmarksMirrorStructureChild,
+    IndexPageImagesURL,
+    IndexPageMetadataCacheKey
 ]
 
 private let AllTablesIndicesAndViews: [String] = AllViews + AllIndices + AllTables
@@ -100,7 +112,7 @@ private let log = Logger.syncLogger
  * We rely on SQLiteHistory having initialized the favicon table first.
  */
 public class BrowserTable: Table {
-    static let DefaultVersion = 17    // Bug 1298918.
+    static let DefaultVersion = 18    // Bug 1303734.
 
     // TableInfo fields.
     var name: String { return "BROWSER" }
@@ -233,6 +245,43 @@ public class BrowserTable: Table {
             "url TEXT NOT NULL UNIQUE, " +
             "title TEXT" +
         ") "
+
+    let pageMetadataCreate =
+        "CREATE TABLE IF NOT EXISTS \(TablePageMetadata) (" +
+            "id INTEGER PRIMARY KEY, " +
+            "cache_key LONGVARCHAR UNIQUE, " +
+            "site_url TEXT, " +
+            "title TEXT, " +
+            "type VARCHAR(32), " +
+            "description TEXT, " +
+            "media_url LONGVARCHAR, " +
+            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+            "expired_at LONG" +
+        ") "
+
+    let pageImagesCreate =
+        "CREATE TABLE IF NOT EXISTS \(TablePageImages) (" +
+            "id INTEGER PRIMARY KEY, " +
+            "url LONGVARCHAR UNIQUE, " +
+            "type INTEGER, " +
+            "height INTEGER, " +
+            "width INTEGER, " +
+            "color VARCHAR(32)" +
+        ")"
+
+    let pageMetadataImagesCreate =
+        "CREATE TABLE IF NOT EXISTS \(TablePageMetadataImages) (" +
+            "metadata_id INTEGER, " +
+            "image_id INTEGER, " +
+            "FOREIGN KEY(metadata_id) REFERENCES page_metadata(id) ON DELETE CASCADE, " +
+            "FOREIGN KEY(image_id) REFERENCES page_images(id) ON DELETE CASCADE" +
+        ") "
+
+    let indexPageMetadataCreate =
+        "CREATE UNIQUE INDEX IF NOT EXISTS \(IndexPageMetadataCacheKey) ON page_metadata (cache_key)"
+
+    let indexPageImagesCreate =
+        "CREATE UNIQUE INDEX IF NOT EXISTS \(IndexPageImagesURL) ON page_images (url)"
 
     let iconColumns = ", faviconID INTEGER REFERENCES \(TableFavicons)(id) ON DELETE SET NULL"
     let mirrorColumns = ", is_overridden TINYINT NOT NULL DEFAULT 0"
@@ -543,6 +592,11 @@ public class BrowserTable: Table {
             widestFavicons,
             historyIDsWithIcon,
             iconForURL,
+            pageMetadataCreate,
+            pageMetadataImagesCreate,
+            pageImagesCreate,
+            indexPageImagesCreate,
+            indexPageMetadataCreate,
             self.queueTableCreate,
             self.topSitesTableCreate,
             self.localBookmarksView,
@@ -768,6 +822,19 @@ public class BrowserTable: Table {
                 // Adds the local_modified, server_modified times to the local bookmarks view
                 "DROP VIEW IF EXISTS \(ViewBookmarksLocalOnMirror)",
                 self.localBookmarksView]) {
+                return false
+            }
+        }
+        
+        if from < 18 && to >= 18 {
+            if !self.run(db, queries: [
+
+                // Adds tables/indicies for metadata content
+                pageMetadataCreate,
+                pageImagesCreate,
+                pageMetadataImagesCreate,
+                indexPageMetadataCreate,
+                indexPageImagesCreate]) {
                 return false
             }
         }
